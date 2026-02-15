@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Portfolio - Kengni Finance{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-briefcase"></i> Mon Portfolio</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPortfolioModal">
+            <i class="bi bi-plus-circle"></i> Ajouter un actif
+        </button>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card">
+                <i class="bi bi-graph-up text-success" style="font-size: 36px;"></i>
+                <h3 class="text-success">+0.00%</h3>
+                <p>Performance globale</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card">
+                <i class="bi bi-currency-dollar text-primary" style="font-size: 36px;"></i>
+                <h3>0 FCFA</h3>
+                <p>Valeur totale</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card">
+                <i class="bi bi-pie-chart text-warning" style="font-size: 36px;"></i>
+                <h3>{{ portfolio|length }}</h3>
+                <p>Actifs en portefeuille</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Mes investissements</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Symbole</th>
+                            <th>Quantité</th>
+                            <th>Prix d'achat</th>
+                            <th>Valeur d'achat</th>
+                            <th>Date d'achat</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in portfolio %}
+                        <tr>
+                            <td><strong>{{ item.symbol }}</strong></td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{{ "%.2f"|format(item.purchase_price) }} FCFA</td>
+                            <td>{{ "%.2f"|format(item.quantity * item.purchase_price) }} FCFA</td>
+                            <td>{{ item.purchase_date }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">
+                                Aucun actif dans votre portfolio
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ajouter au Portfolio -->
+<div class="modal fade" id="addPortfolioModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ajouter un actif</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_portfolio') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Symbole (Ticker)</label>
+                        <input type="text" class="form-control" name="symbol" placeholder="Ex: AAPL, TSLA, BTC" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Quantité</label>
+                        <input type="number" class="form-control" name="quantity" step="0.001" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Prix d'achat (FCFA)</label>
+                        <input type="number" class="form-control" name="purchase_price" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date d'achat</label>
+                        <input type="date" class="form-control" name="purchase_date" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Ajouter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

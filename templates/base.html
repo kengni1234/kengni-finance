@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Kengni Finance{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .sidebar {
+            height: 100vh;
+            background: var(--primary-color);
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 250px;
+            padding: 20px 0;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar .logo {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 0 20px;
+        }
+        
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.7);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            color: white;
+            background: rgba(255,255,255,0.1);
+            border-left: 3px solid var(--secondary-color);
+        }
+        
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .stat-card p {
+            color: #7f8c8d;
+            margin: 0;
+        }
+        
+        .btn-primary {
+            background: var(--secondary-color);
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: scale(1.05);
+        }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+        
+        .table {
+            background: white;
+            border-radius: 10px;
+        }
+        
+        .badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if session.user_id %}
+    <div class="sidebar">
+        <div class="logo">
+            <i class="bi bi-currency-dollar"></i> Kengni Finance
+        </div>
+        <nav class="nav flex-column">
+            <a class="nav-link" href="{{ url_for('dashboard') }}">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+            <a class="nav-link" href="{{ url_for('finances') }}">
+                <i class="bi bi-wallet2"></i> Finances
+            </a>
+            <a class="nav-link" href="{{ url_for('portfolio') }}">
+                <i class="bi bi-briefcase"></i> Portfolio
+            </a>
+            <a class="nav-link" href="{{ url_for('trading') }}">
+                <i class="bi bi-graph-up-arrow"></i> Trading
+            </a>
+            <a class="nav-link" href="{{ url_for('trading_journal') }}">
+                <i class="bi bi-journal-text"></i> Journal
+            </a>
+            <a class="nav-link" href="{{ url_for('analysis') }}">
+                <i class="bi bi-bar-chart"></i> Analyse
+            </a>
+            <a class="nav-link" href="{{ url_for('reports') }}">
+                <i class="bi bi-file-earmark-text"></i> Rapports
+            </a>
+            <a class="nav-link" href="{{ url_for('notifications') }}">
+                <i class="bi bi-bell"></i> Notifications
+            </a>
+            <a class="nav-link" href="{{ url_for('settings') }}">
+                <i class="bi bi-gear"></i> Paramètres
+            </a>
+            <a class="nav-link" href="{{ url_for('ai_assistant') }}">
+                <i class="bi bi-robot"></i> Assistant IA
+            </a>
+            <hr style="border-color: rgba(255,255,255,0.2);">
+            <a class="nav-link" href="{{ url_for('logout') }}">
+                <i class="bi bi-box-arrow-right"></i> Déconnexion
+            </a>
+        </nav>
+    </div>
+    {% endif %}
+
+    <div class="{% if session.user_id %}main-content{% else %}container mt-5{% endif %}">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Analyse - Kengni Finance{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4"><i class="bi bi-bar-chart"></i> Analyse Financière</h2>
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5>Revenus vs Dépenses (12 derniers mois)</h5>
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5>Dépenses par catégorie</h5>
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Graphique mensuel
+const monthlyCtx = document.getElementById('monthlyChart');
+if (monthlyCtx) {
+    new Chart(monthlyCtx, {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
+            datasets: [{
+                label: 'Revenus',
+                data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                borderColor: '#27ae60',
+                backgroundColor: 'rgba(39, 174, 96, 0.1)'
+            }, {
+                label: 'Dépenses',
+                data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                borderColor: '#e74c3c',
+                backgroundColor: 'rgba(231, 76, 60, 0.1)'
+            }]
+        }
+    });
+}
+</script>
+{% endblock %}
