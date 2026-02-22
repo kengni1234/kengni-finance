@@ -31,7 +31,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
@@ -43,7 +43,7 @@ GMAIL_CONFIG = {
     'receiver_email':  'fabrice.kengni@icloud.com',
     'smtp_host':       'smtp.gmail.com',
     'smtp_port':       587,
-    'smtp_password':   'hmoz eelj nckb npqi',
+    'smtp_password':   os.environ.get('GMAIL_PASSWORD', 'hmoz eelj nckb npqi'),
 }
 
 # ── Types et couleurs des événements d'agenda ─────────────────────────────────
@@ -86,8 +86,38 @@ app.jinja_env.globals.update({
 # Ensure upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Database Configuration
-DB_FILE = 'kengni_finance.db'
+# Database Configuration — PostgreSQL sur Railway, SQLite en local
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    # ── Mode PostgreSQL (Railway) ──────────────────────────────────────────────
+    import psycopg2
+    import psycopg2.extras
+
+    DB_FILE = None  # Non utilisé en mode PostgreSQL
+
+    def get_db_connection():
+        """Create and return PostgreSQL database connection"""
+        try:
+            conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+            conn.autocommit = False
+            return conn
+        except Exception as e:
+            print(f"PostgreSQL connection error: {e}")
+            return None
+else:
+    # ── Mode SQLite (local) ────────────────────────────────────────────────────
+    DB_FILE = 'kengni_finance.db'
+
+    def get_db_connection():
+        """Create and return SQLite database connection"""
+        try:
+            connection = sqlite3.connect(DB_FILE)
+            connection.row_factory = sqlite3.Row
+            return connection
+        except Exception as e:
+            print(f"Database connection error: {e}")
+            return None
 
 # Allowed extensions for image uploads
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -95,28 +125,22 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Database Connection Helper
-def get_db_connection():
-    """Create and return database connection"""
-    try:
-        connection = sqlite3.connect(DB_FILE)
-        connection.row_factory = sqlite3.Row
-        return connection
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        return None
-
 # Initialize database with enhanced tables
 def init_db():
     """Initialize database with all tables"""
     conn = get_db_connection()
     if conn:
         cursor = conn.cursor()
+
+        # Détecter le mode : PostgreSQL ou SQLite
+        PG = DATABASE_URL is not None
+        PH = '%s' if PG else '?'  # placeholder
+        AI = 'SERIAL' if PG else 'INTEGER'  # auto-increment
         
         # Users table with preferences
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             username TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
@@ -134,11 +158,11 @@ def init_db():
         ''')
         
         # Financial transactions with enhanced categories
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS financial_transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             user_id INTEGER NOT NULL,
-            type TEXT NOT NULL CHECK(type IN ('revenue', 'expense', 'receivable', 'credit', 'debt', 'investment', 'epargne')),
+            type TEXT NOT NULL,
             category TEXT NOT NULL,
             subcategory TEXT,
             reason TEXT NOT NULL,
@@ -149,7 +173,7 @@ def init_db():
             time TEXT NOT NULL,
             payment_method TEXT,
             reference TEXT,
-            status TEXT DEFAULT 'completed' CHECK(status IN ('completed', 'pending', 'cancelled')),
+            status TEXT DEFAULT 'completed',
             notes TEXT,
             tags TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -159,9 +183,9 @@ def init_db():
         ''')
         
         # Trading positions
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS positions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             user_id INTEGER NOT NULL,
             symbol TEXT NOT NULL,
             quantity REAL NOT NULL,
@@ -178,9 +202,9 @@ def init_db():
         ''')
         
         # Trading transactions
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             user_id INTEGER NOT NULL,
             symbol TEXT NOT NULL,
             type TEXT NOT NULL,
@@ -196,15 +220,15 @@ def init_db():
         ''')
         
         # Trading journal with images
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS trading_journal (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             user_id INTEGER NOT NULL,
             transaction_id INTEGER,
             symbol TEXT NOT NULL,
             date TEXT NOT NULL,
             time TEXT NOT NULL,
-            type TEXT NOT NULL CHECK(type IN ('buy', 'sell')),
+            type TEXT NOT NULL,
             quantity REAL NOT NULL,
             entry_price REAL NOT NULL,
             exit_price REAL,
@@ -227,11 +251,11 @@ def init_db():
         ''')
         
         # AI Analysis results
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS ai_analysis (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             user_id INTEGER NOT NULL,
-            analysis_type TEXT NOT NULL CHECK(analysis_type IN ('financial', 'trading', 'psychological', 'strategy')),
+            analysis_type TEXT NOT NULL,
             subject TEXT,
             insights TEXT NOT NULL,
             recommendations TEXT,
@@ -243,9 +267,9 @@ def init_db():
         ''')
         
         # Trader performance scores
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS trader_scores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             user_id INTEGER NOT NULL,
             date TEXT NOT NULL,
             overall_score REAL NOT NULL,
@@ -264,26 +288,26 @@ def init_db():
         ''')
         
         # Psychological patterns detection
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS psychological_patterns (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             user_id INTEGER NOT NULL,
-            pattern_type TEXT NOT NULL CHECK(pattern_type IN ('FOMO', 'revenge_trading', 'overtrading', 'overconfidence', 'fear', 'greed')),
-            severity TEXT CHECK(severity IN ('low', 'medium', 'high', 'critical')),
+            pattern_type TEXT NOT NULL,
+            severity TEXT,
             detected_date TEXT NOT NULL,
             description TEXT,
             evidence TEXT,
             recommendations TEXT,
-            status TEXT DEFAULT 'active' CHECK(status IN ('active', 'resolved', 'monitoring')),
+            status TEXT DEFAULT 'active',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
         ''')
         
         # Reports table
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS reports (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             user_id INTEGER NOT NULL,
             title TEXT NOT NULL,
             report_type TEXT NOT NULL,
@@ -301,11 +325,11 @@ def init_db():
         ''')
         
         # Notifications
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS notifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             user_id INTEGER NOT NULL,
-            type TEXT NOT NULL CHECK(type IN ('alert', 'warning', 'info', 'success')),
+            type TEXT NOT NULL,
             title TEXT NOT NULL,
             message TEXT NOT NULL,
             is_read INTEGER DEFAULT 0,
@@ -316,26 +340,24 @@ def init_db():
         ''')
 
         # ── TABLE : Événements d'agenda ────────────────────────────────────────
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS agenda_events (
-            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            id               {AI} PRIMARY KEY,
             user_id          INTEGER NOT NULL,
             title            TEXT NOT NULL,
             description      TEXT,
-            event_type       TEXT NOT NULL DEFAULT 'personnel'
-                             CHECK(event_type IN ('trading','finance','formation','personnel','reunion','revue')),
+            event_type       TEXT NOT NULL DEFAULT 'personnel',
             start_datetime   TEXT NOT NULL,
             end_datetime     TEXT NOT NULL,
             all_day          INTEGER DEFAULT 0,
-            recurrence       TEXT DEFAULT 'none'
-                             CHECK(recurrence IN ('none','daily','weekly','monthly')),
+            recurrence       TEXT DEFAULT 'none',
             reminder_minutes INTEGER DEFAULT 30,
             email_reminder   INTEGER DEFAULT 1,
             app_reminder     INTEGER DEFAULT 1,
             location         TEXT,
             notes            TEXT,
             linked_course_id INTEGER,
-            status           TEXT DEFAULT 'active' CHECK(status IN ('active','cancelled','completed')),
+            status           TEXT DEFAULT 'active',
             created_at       TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at       TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
@@ -343,20 +365,20 @@ def init_db():
         ''')
 
         # ── TABLE : Rappels envoyés (anti-doublon) ─────────────────────────────
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS agenda_reminders_sent (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            id        {AI} PRIMARY KEY,
             event_id  INTEGER NOT NULL,
             sent_at   TEXT NOT NULL,
-            method    TEXT NOT NULL CHECK(method IN ('email','app')),
+            method    TEXT NOT NULL,
             FOREIGN KEY (event_id) REFERENCES agenda_events(id)
         )
         ''')
         
         # Training courses
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS training_courses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {AI} PRIMARY KEY,
             user_id INTEGER NOT NULL,
             title TEXT NOT NULL DEFAULT 'Sans titre',
             description TEXT,
@@ -382,58 +404,62 @@ def init_db():
         )
         ''')
         # Migration: add columns if not exist
-        for col, defn in [
-            ('participant_names', 'TEXT DEFAULT ""'),
-            ('analyses', 'TEXT DEFAULT ""'),
-            ('strategies', 'TEXT DEFAULT ""'),
-            ('position_images', 'TEXT DEFAULT "[]"'),
-            ('time_start', 'TEXT DEFAULT ""'),
-            ('time_end', 'TEXT DEFAULT ""'),
-        ]:
-            try:
-                cursor.execute(f'ALTER TABLE training_courses ADD COLUMN {col} {defn}')
-            except Exception:
-                pass
+        if not PG:
+            for col, defn in [
+                ('participant_names', 'TEXT DEFAULT ""'),
+                ('analyses', 'TEXT DEFAULT ""'),
+                ('strategies', 'TEXT DEFAULT ""'),
+                ('position_images', 'TEXT DEFAULT "[]"'),
+                ('time_start', 'TEXT DEFAULT ""'),
+                ('time_end', 'TEXT DEFAULT ""'),
+            ]:
+                try:
+                    cursor.execute(f'ALTER TABLE training_courses ADD COLUMN {col} {defn}')
+                except Exception:
+                    pass
 
         # ── TABLE : Inscriptions Kengni Trading Academy ──
-        cursor.execute('''
+        cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS training_leads (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            id              {AI} PRIMARY KEY,
             full_name       TEXT NOT NULL,
             email           TEXT NOT NULL,
             whatsapp        TEXT NOT NULL,
             level_selected  TEXT NOT NULL,
             capital         TEXT,
             objective       TEXT,
-            source          TEXT DEFAULT "Non renseigné",
-            status          TEXT NOT NULL DEFAULT "Nouveau",
+            source          TEXT DEFAULT 'Non renseigné',
+            status          TEXT NOT NULL DEFAULT 'Nouveau',
             notes           TEXT,
             user_id         INTEGER,
             created_at      TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
         ''')
-        for col, defn in [('notes', 'TEXT'), ('user_id', 'INTEGER'), ('capital', 'TEXT'), ('objective', 'TEXT'),
-                          ('payment_method', 'TEXT'), ('payment_ref', 'TEXT'), ('payment_status', "TEXT DEFAULT 'En attente'"),
-                          ('amount_paid', 'REAL DEFAULT 0'), ('sincire_sent_at', 'TEXT')]:
-            try:
-                cursor.execute(f'ALTER TABLE training_leads ADD COLUMN {col} {defn}')
-            except Exception:
-                pass
+        if not PG:
+            for col, defn in [('notes', 'TEXT'), ('user_id', 'INTEGER'), ('capital', 'TEXT'), ('objective', 'TEXT'),
+                              ('payment_method', 'TEXT'), ('payment_ref', 'TEXT'), ('payment_status', "TEXT DEFAULT 'En attente'"),
+                              ('amount_paid', 'REAL DEFAULT 0'), ('sincire_sent_at', 'TEXT')]:
+                try:
+                    cursor.execute(f'ALTER TABLE training_leads ADD COLUMN {col} {defn}')
+                except Exception:
+                    pass
 
         # Check if default user exists
-        cursor.execute("SELECT COUNT(*) as count FROM users WHERE email = ?", ('fabrice.kengni@icloud.com',))
-        if cursor.fetchone()[0] == 0:
+        cursor.execute(f"SELECT COUNT(*) as count FROM users WHERE email = {PH}", ('fabrice.kengni@icloud.com',))
+        result = cursor.fetchone()
+        count = result[0] if PG else result['count']
+        if count == 0:
             hashed_password = generate_password_hash('Kengni@fablo12')
-            cursor.execute('''
+            cursor.execute(f'''
                 INSERT INTO users (username, email, password, role, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES ({PH}, {PH}, {PH}, {PH}, {PH})
             ''', ('kengni', 'fabrice.kengni@icloud.com', hashed_password, 'admin', datetime.now().isoformat()))
         else:
             # Ensure admin always has the correct password (double sécurité)
             hashed_password = generate_password_hash('Kengni@fablo12')
             cursor.execute(
-                "UPDATE users SET password=? WHERE email=? AND role='admin'",
+                f"UPDATE users SET password={PH} WHERE email={PH} AND role='admin'",
                 (hashed_password, 'fabrice.kengni@icloud.com')
             )
         
@@ -444,6 +470,15 @@ def init_db():
 # ── URL secrète admin ──
 ADMIN_SECRET_TOKEN = 'kengni-control-7749'
 ADMIN_SECONDARY_PASSWORD = 'Kengni@fablo12'
+
+# ── Initialisation automatique (gunicorn / Railway ne passe pas par __main__) ──
+with app.app_context():
+    try:
+        init_db()
+        start_agenda_scheduler()
+        start_report_scheduler()
+    except Exception as _e:
+        print(f"[Init] Erreur au démarrage : {_e}")
 
 
 @app.context_processor
@@ -4078,15 +4113,19 @@ def _agenda_check_reminders():
     while True:
         try:
             now = datetime.now()
-            conn = sqlite3.connect(DB_FILE)
-            conn.row_factory = sqlite3.Row
+            conn = get_db_connection()
+            if not conn:
+                time.sleep(60)
+                continue
             cursor = conn.cursor()
             window = (now + timedelta(hours=48)).isoformat()
+            PG = DATABASE_URL is not None
+            PH = '%s' if PG else '?'
 
-            cursor.execute('''
+            cursor.execute(f'''
                 SELECT * FROM agenda_events
                 WHERE status = 'active'
-                  AND start_datetime BETWEEN ? AND ?
+                  AND start_datetime BETWEEN {PH} AND {PH}
                   AND (email_reminder = 1 OR app_reminder = 1)
             ''', (now.isoformat(), window))
             events = [dict(r) for r in cursor.fetchall()]
@@ -4100,9 +4139,9 @@ def _agenda_check_reminders():
                         continue
 
                     # Anti-doublon
-                    cursor.execute('''
+                    cursor.execute(f'''
                         SELECT id FROM agenda_reminders_sent
-                        WHERE event_id = ? AND sent_at >= ?
+                        WHERE event_id = {PH} AND sent_at >= {PH}
                     ''', (ev['id'], (now - timedelta(minutes=3)).isoformat()))
                     if cursor.fetchone():
                         continue
@@ -4111,21 +4150,21 @@ def _agenda_check_reminders():
                     if ev['email_reminder']:
                         ok = _send_agenda_email(ev, ev['reminder_minutes'])
                         if ok:
-                            cursor.execute('INSERT INTO agenda_reminders_sent (event_id,sent_at,method) VALUES (?,?,?)',
+                            cursor.execute(f'INSERT INTO agenda_reminders_sent (event_id,sent_at,method) VALUES ({PH},{PH},{PH})',
                                            (ev['id'], now.isoformat(), 'email'))
 
                     # Notification in-app
                     if ev['app_reminder']:
                         h = ev['reminder_minutes']
                         label = f"{h//60}h" if h >= 60 else f"{h}min"
-                        cursor.execute('''
+                        cursor.execute(f'''
                             INSERT INTO notifications (user_id, type, title, message, action_url, created_at)
-                            VALUES (?,?,?,?,?,?)
+                            VALUES ({PH},{PH},{PH},{PH},{PH},{PH})
                         ''', (ev['user_id'], 'warning' if h <= 15 else 'info',
                               f"⏰ Rappel dans {label} : {ev['title']}",
                               f"Votre événement commence à {ev['start_datetime'][11:16]}.",
                               '/agenda', now.isoformat()))
-                        cursor.execute('INSERT INTO agenda_reminders_sent (event_id,sent_at,method) VALUES (?,?,?)',
+                        cursor.execute(f'INSERT INTO agenda_reminders_sent (event_id,sent_at,method) VALUES ({PH},{PH},{PH})',
                                        (ev['id'], now.isoformat(), 'app'))
 
                     conn.commit()
@@ -4757,15 +4796,19 @@ def _build_report_html(data: dict, period: str) -> str:
 def _collect_report_data() -> dict:
     """Collecte toutes les données pour le rapport."""
     try:
-        conn = sqlite3.connect(DB_FILE)
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection()
+        if not conn:
+            return {'leads': {}, 'finances': {}, 'trades': {}, 'agenda': [], 'notifications': 0}
+        PG = DATABASE_URL is not None
+        PH = '%s' if PG else '?'
         cur  = conn.cursor()
         now  = datetime.now()
         d30  = (now - timedelta(days=30)).isoformat()
 
         # Leads
         cur.execute("SELECT status FROM training_leads")
-        all_leads = [r['status'] for r in cur.fetchall()]
+        rows = cur.fetchall()
+        all_leads = [r[0] if PG else r['status'] for r in rows]
         total_l   = len(all_leads)
         paye_l    = all_leads.count('Payé')
         conv      = f"{round(paye_l/total_l*100,1)}%" if total_l else "0%"
@@ -4780,7 +4823,7 @@ def _collect_report_data() -> dict:
         }
 
         # Finances
-        cur.execute("SELECT type, amount FROM transactions WHERE user_id=1 AND created_at>=?", (d30,))
+        cur.execute(f"SELECT type, amount FROM transactions WHERE user_id=1 AND created_at>={PH}", (d30,))
         txns = [dict(r) for r in cur.fetchall()]
         rev  = sum(t['amount'] for t in txns if t['amount'] > 0)
         dep  = abs(sum(t['amount'] for t in txns if t['amount'] < 0))
@@ -4792,10 +4835,12 @@ def _collect_report_data() -> dict:
 
         # Trading
         try:
-            cur.execute("SELECT COUNT(*) as c FROM transactions WHERE user_id=1 AND type IN ('buy','sell') AND created_at>=?", (d30,))
-            total_tr = cur.fetchone()['c']
-            cur.execute("SELECT COUNT(*) as c FROM transactions WHERE user_id=1 AND type='sell' AND amount>0 AND created_at>=?", (d30,))
-            win_tr   = cur.fetchone()['c']
+            cur.execute(f"SELECT COUNT(*) as c FROM transactions WHERE user_id=1 AND type IN ('buy','sell') AND created_at>={PH}", (d30,))
+            row = cur.fetchone()
+            total_tr = row[0] if PG else row['c']
+            cur.execute(f"SELECT COUNT(*) as c FROM transactions WHERE user_id=1 AND type='sell' AND amount>0 AND created_at>={PH}", (d30,))
+            row = cur.fetchone()
+            win_tr = row[0] if PG else row['c']
             wr       = f"{round(win_tr/total_tr*100)}%" if total_tr else "0%"
         except Exception:
             total_tr, win_tr, wr = 0, 0, "0%"
@@ -4803,16 +4848,17 @@ def _collect_report_data() -> dict:
         trades = {'total': total_tr, 'gagnants': win_tr, 'winrate': wr}
 
         # Agenda — 8 prochains événements
-        cur.execute("""
+        cur.execute(f"""
             SELECT title, event_type, start_datetime FROM agenda_events
-            WHERE status='active' AND start_datetime >= ?
+            WHERE status='active' AND start_datetime >= {PH}
             ORDER BY start_datetime ASC LIMIT 8
         """, (now.isoformat(),))
-        agenda = [dict(r) for r in cur.fetchall()]
+        agenda = [dict(zip(['title','event_type','start_datetime'], r)) if PG else dict(r) for r in cur.fetchall()]
 
         # Notifications non lues
-        cur.execute("SELECT COUNT(*) as c FROM notifications WHERE is_read=0 AND user_id=1")
-        notifs = cur.fetchone()['c']
+        cur.execute(f"SELECT COUNT(*) as c FROM notifications WHERE is_read=0 AND user_id=1")
+        row = cur.fetchone()
+        notifs = row[0] if PG else row['c']
 
         conn.close()
         return {'leads': leads, 'finances': fin, 'trades': trades, 'agenda': agenda, 'notifications': notifs}
@@ -4913,11 +4959,11 @@ if __name__ == '__main__':
     print("🚀 Kengni Finance v2.0 - Démarrage")
     print("=" * 60)
     print("📊 Application de gestion financière et trading avec IA")
-    print("🌐 URL: http://localhost:5001")
+    print("🌐 Mode:", "PostgreSQL (Railway)" if DATABASE_URL else "SQLite (Local)")
     print("👤 Email: fabrice.kengni@icloud.com")
-    print("🔐 Password: Kengni@fablo12")
-    print("📅 Agenda: http://localhost:5001/agenda")
-    print("📧 Rappels Gmail: fabricekengni90@gmail.com → fabrice.kengni@icloud.com")
+    print("📅 Agenda: /agenda")
     print("=" * 60)
     
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    port = int(os.environ.get('PORT', 5001))
+    debug = not DATABASE_URL  # debug=False en production Railway
+    app.run(debug=debug, host='0.0.0.0', port=port)
