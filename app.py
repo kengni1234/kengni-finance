@@ -1067,7 +1067,7 @@ def index():
 def login():
     """User login"""
     if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form
+        data = request.get_json(silent=True) or request.form if request.is_json else request.form
         email = data.get('email')
         password = data.get('password')
         
@@ -1258,7 +1258,7 @@ def login_flyers():
 def register():
     """User registration"""
     if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form
+        data = request.get_json(silent=True) or request.form if request.is_json else request.form
         username = data.get('username')
         email = data.get('email')
         password = data.get('password')
@@ -1632,7 +1632,7 @@ def delete_journal(id):
 @login_required
 def add_financial_transaction():
     """Add new financial transaction"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or request.form
     user_id = session['user_id']
     
     required_fields = ['type', 'category', 'reason', 'amount', 'date', 'time']
@@ -1724,7 +1724,7 @@ def add_journal_entry():
             image_path = filepath
     
     # Get form data
-    data = request.form if not request.is_json else request.get_json()
+    data = request.form if not request.is_json else request.get_json(silent=True) or request.form
     
     conn = get_db_connection()
     if conn:
@@ -1814,7 +1814,7 @@ def trading():
 def execute_trade():
     """Execute trade - accepte JSON et form-data"""
     if request.is_json:
-        data = request.get_json()
+        data = request.get_json(silent=True) or request.form
     else:
         data = request.form.to_dict()
     user_id = session['user_id']
@@ -1949,7 +1949,7 @@ def portfolio():
 @login_required
 def add_position():
     """Add new portfolio position"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or request.form
     user_id = session['user_id']
     
     required_fields = ['symbol', 'quantity', 'avg_price']
@@ -2494,7 +2494,7 @@ def ai_assistant():
 @login_required
 def ai_chat():
     """AI conversational assistant endpoint"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or request.form
     user_id = session['user_id']
     question = data.get('question', '').lower()
     
@@ -2814,7 +2814,7 @@ def settings():
 @login_required
 def update_settings():
     """Update user settings"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or request.form
     user_id = session['user_id']
     
     conn = get_db_connection()
@@ -2922,7 +2922,7 @@ def reports():
 @login_required
 def generate_report():
     """Generate financial report"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or request.form
     user_id = session['user_id']
     
     report_type = data.get('type', 'monthly')
@@ -3210,7 +3210,7 @@ def admin_secret_entry():
 
 @app.route(f'/{ADMIN_SECRET_TOKEN}/auth', methods=['POST'])
 def admin_auth():
-    data = request.get_json() if request.is_json else request.form
+    data = request.get_json(silent=True) or request.form if request.is_json else request.form
     email    = data.get('email','').strip()
     password = data.get('password','').strip()
     conn = get_db_connection()
@@ -3263,7 +3263,7 @@ def admin_secondary_verify():
     """Double sécurité admin — mot de passe secondaire Kengni@fablo12"""
     error = None
     if request.method == 'POST':
-        pwd = (request.get_json() or request.form).get('secondary_password', '')
+        pwd = (request.get_json(silent=True) or request.form or request.form).get('secondary_password', '')
         # Compteur de tentatives
         session['admin_sec_attempts'] = session.get('admin_sec_attempts', 0) + 1
         if session['admin_sec_attempts'] > 3:
@@ -3289,7 +3289,7 @@ def admin_secondary_verify():
 @app.route('/admin/create-user', methods=['POST'])
 @admin_required
 def admin_create_user():
-    data = request.get_json()
+    data = request.get_json(silent=True) or request.form
     username,email,password = data.get('username','').strip(), data.get('email','').strip(), data.get('password','').strip()
     role, status = data.get('role','user'), data.get('status','active')
     allowed = ['viewer','user','editor','admin']
@@ -3310,7 +3310,7 @@ def admin_create_user():
 @app.route('/admin/update-user/<int:user_id>', methods=['POST'])
 @admin_required
 def admin_update_user(user_id):
-    data = request.get_json()
+    data = request.get_json(silent=True) or request.form
     role, status = data.get('role'), data.get('status')
     allowed = ['viewer','user','editor','admin']
     if session.get('role')=='superadmin': allowed.append('superadmin')
@@ -3327,7 +3327,7 @@ def admin_update_user(user_id):
 @app.route('/admin/reset-password/<int:user_id>', methods=['POST'])
 @admin_required
 def admin_reset_password(user_id):
-    data = request.get_json()
+    data = request.get_json(silent=True) or request.form
     password = data.get('password','').strip()
     if len(password)<6: return jsonify({'success':False,'message':'Mot de passe trop court'}),400
     conn = get_db_connection()
@@ -3562,7 +3562,7 @@ def training_delete(cid):
 @app.route('/api/training/fetch-thumb', methods=['POST'])
 @login_required
 def training_fetch_thumb():
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or request.form or {}
     url = data.get('url', '')
     thumb = detect_thumbnail(url)
     return jsonify({'thumbnail': thumb})
@@ -3899,7 +3899,7 @@ def sincire_lead(lead_id):
 @admin_required
 def update_lead_payment(lead_id):
     """Met à jour les infos de paiement d'un lead."""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or request.form or {}
     conn = get_db_connection()
     if not conn:
         return jsonify({'success': False}), 500
@@ -4256,7 +4256,7 @@ def agenda():
 @login_required
 def agenda_create_event():
     user_id = session['user_id']
-    data    = request.get_json() or {}
+    data    = request.get_json(silent=True) or request.form or {}
 
     title      = (data.get('title') or '').strip()
     event_type = data.get('event_type', 'personnel')
@@ -4336,7 +4336,7 @@ def agenda_get_events():
 @login_required
 def agenda_update_event(event_id):
     user_id = session['user_id']
-    data    = request.get_json() or {}
+    data    = request.get_json(silent=True) or request.form or {}
     conn    = get_db_connection()
     if not conn:
         return jsonify({'success': False}), 500
