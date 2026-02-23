@@ -1,0 +1,37 @@
+# Base de données SQLite (à ne jamais committer)
+*.db
+*.sqlite
+*.sqlite3
+kengni_finance*.db
+app_py.backup*
+
+# Environnement virtuel
+venv/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Variables d'environnement (SECRETS)
+.env
+.env.local
+.env.production
+
+# Uploads utilisateurs
+static/uploads/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+*.backup
+*_backup_*
