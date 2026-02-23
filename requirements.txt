@@ -8,3 +8,4 @@ psycopg2-binary
 gunicorn
 gunicorn
 psycopg2-binary
+cloudinary
