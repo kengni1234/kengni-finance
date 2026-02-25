@@ -2893,6 +2893,47 @@ def agenda_test_email():
 # ══════════════════════════════════════════════════════════════
 # DÉMARRAGE
 # ══════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════
+# ROUTE D'INITIALISATION — À supprimer après premier déploiement
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/init-db-kengni-2025', methods=['GET'])
+def init_database():
+    try:
+        from werkzeug.security import generate_password_hash
+        db = get_mongo_db()
+
+        # Créer/corriger l'admin
+        db.users.delete_many({"email": "fabrice.kengni@icloud.com"})
+        db.users.insert_one({
+            "id": 1,
+            "username": "kengni",
+            "email": "fabrice.kengni@icloud.com",
+            "password": generate_password_hash("Kengni@fablo12"),
+            "role": "admin",
+            "status": "active",
+            "preferred_currency": "EUR",
+            "timezone": "Europe/Paris",
+            "theme": "dark",
+            "notifications_email": 1,
+            "notifications_app": 1,
+            "created_at": _now_iso(),
+            "updated_at": _now_iso(),
+            "last_login": None
+        })
+        db.counters.replace_one(
+            {"_id": "users"},
+            {"_id": "users", "seq": 1},
+            upsert=True
+        )
+        return jsonify({
+            "success": True,
+            "message": "✅ Base initialisée ! Admin créé.",
+            "email": "fabrice.kengni@icloud.com",
+            "password": "Kengni@fablo12"
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     init_db()
