@@ -1,0 +1,17 @@
+# ══════════════════════════════════════════════
+# KENGNI FINANCE — Variables d'environnement
+# À copier aussi dans Vercel → Settings → Env Vars
+# ══════════════════════════════════════════════
+
+MONGODB_URI=mongodb+srv://Vercel-Admin-fabricekengni12_db_user:MWoiKRSDZO3eVBVL@fabricekengni12-db-user.v193src.mongodb.net/kengni_finance?retryWrites=true&w=majority&appName=fabricekengni12-db-user
+
+SECRET_KEY=kengni-finance-secret-2025-xK9mP2qR7vL
+
+ADMIN_EMAIL=fabrice.kengni@icloud.com
+ADMIN_PASSWORD=Kengni@fablo12
+ADMIN_SECRET_TOKEN=kengni-control-7749
+ADMIN_SECONDARY_PASSWORD=Kengni@fablo12
+
+GMAIL_SENDER=fabrice.kengni12@gmail.com
+GMAIL_RECEIVER=fabrice.kengni@icloud.com
+GMAIL_APP_PASSWORD=hmoz eelj nckb npqi

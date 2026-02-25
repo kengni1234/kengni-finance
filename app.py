@@ -43,12 +43,12 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 
 # ── Configuration Gmail pour les rappels d'agenda ──────────────────────────────
 GMAIL_CONFIG = {
-    'sender_email':    os.environ.get('GMAIL_SENDER', 'fabrice.kengni12@gmail.com'),
+    'sender_email':    os.environ.get('GMAIL_SENDER',       'fabrice.kengni12@gmail.com'),
     'sender_name':     'Kengni Finance — Agenda',
-    'receiver_email':  'fabrice.kengni@icloud.com',
+    'receiver_email':  os.environ.get('GMAIL_RECEIVER',     'fabrice.kengni@icloud.com'),
     'smtp_host':       'smtp.gmail.com',
     'smtp_port':       587,
-    'smtp_password':   os.environ.get('GMAIL_APP_PASSWORD', 'hmoz eelj nckb npqi'),
+    'smtp_password':   os.environ.get('GMAIL_APP_PASSWORD', ''),
 }
 
 # ── Types et couleurs des événements d'agenda ─────────────────────────────────
@@ -98,8 +98,8 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ── URL secrète admin ──
-ADMIN_SECRET_TOKEN = 'kengni-control-7749'
-ADMIN_SECONDARY_PASSWORD = 'Kengni@fablo12'
+ADMIN_SECRET_TOKEN        = os.environ.get('ADMIN_SECRET_TOKEN',        'kengni-control-7749')
+ADMIN_SECONDARY_PASSWORD  = os.environ.get('ADMIN_SECONDARY_PASSWORD',  'Kengni@fablo12')
 
 # ══════════════════════════════════════════════════════════════
 # HELPERS DB
@@ -2902,7 +2902,6 @@ if __name__ == '__main__':
     print("=" * 60)
     print("📊 Application de gestion financière et trading avec IA")
     print("🌐 URL: http://localhost:5001")
-    print("👤 Email: fabrice.kengni@icloud.com")
-    print("🔐 Password: Kengni@fablo12")
+    print("👤 Email:", os.environ.get('ADMIN_EMAIL', 'fabrice.kengni@icloud.com'))
     print("=" * 60)
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5001)))

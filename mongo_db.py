@@ -2,24 +2,42 @@
 # -*- coding: utf-8 -*-
 """
 mongo_db.py — Couche base de données MongoDB pour Kengni Finance
-Remplace SQLite sans changer la logique métier de app.py
+Version corrigée pour Vercel (serverless) + MongoDB Atlas
 """
 
 from pymongo import MongoClient, ASCENDING, DESCENDING
 import os
 from datetime import datetime
 
-# ── Connexion MongoDB ──────────────────────────────────────────────────────────
-MONGO_URI = os.environ.get("MONGODB_URI", "")
+# ── Connection string ──────────────────────────────────────────────────────────
+MONGO_URI = os.environ.get(
+    "MONGODB_URI",
+    "mongodb+srv://Vercel-Admin-fabricekengni12_db_user:MWoiKRSDZO3eVBVL@fabricekengni12-db-user.v193src.mongodb.net/kengni_finance?retryWrites=true&w=majority&appName=fabricekengni12-db-user"
+)
 
+# ── Cache de connexion (crucial pour Vercel serverless) ───────────────────────
 _client = None
-_db = None
+_db     = None
 
 def get_mongo_db():
     global _client, _db
-    if _db is None:
-        _client = MongoClient(MONGO_URI)
-        _db = _client["kengni_finance"]
+    if _db is not None:
+        try:
+            _client.admin.command("ping")
+            return _db
+        except Exception:
+            _client = None
+            _db = None
+
+    _client = MongoClient(
+        MONGO_URI,
+        serverSelectionTimeoutMS=8000,
+        connectTimeoutMS=8000,
+        socketTimeoutMS=30000,
+        maxPoolSize=1,
+        retryWrites=True,
+    )
+    _db = _client["kengni_finance"]
     return _db
 
 def get_db():
@@ -29,9 +47,8 @@ def get_db():
 def get_col(name):
     return get_mongo_db()[name]
 
-# ── Auto-incrément (remplace INTEGER PRIMARY KEY AUTOINCREMENT) ────────────────
+# ── Auto-incrément ─────────────────────────────────────────────────────────────
 def get_next_id(collection_name: str) -> int:
-    """Retourne le prochain ID entier pour une collection."""
     db = get_mongo_db()
     result = db.counters.find_one_and_update(
         {"_id": collection_name},
@@ -43,7 +60,6 @@ def get_next_id(collection_name: str) -> int:
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def doc_to_dict(doc):
-    """Convertit un document MongoDB en dict compatible SQLite (retire _id, garde id)."""
     if doc is None:
         return None
     d = dict(doc)
@@ -51,19 +67,17 @@ def doc_to_dict(doc):
     return d
 
 def docs_to_list(cursor):
-    """Convertit un curseur MongoDB en liste de dicts."""
     return [doc_to_dict(d) for d in cursor]
 
 # ── Initialisation de la base ──────────────────────────────────────────────────
 def init_db():
-    """Crée les index nécessaires et l'utilisateur admin par défaut."""
     from werkzeug.security import generate_password_hash
 
     db = get_mongo_db()
 
-    # Index uniques et de performance
+    # Index de performance
     db.users.create_index("email", unique=True)
-    db.users.create_index("id", unique=True)
+    db.users.create_index("id",    unique=True)
     db.financial_transactions.create_index([("user_id", ASCENDING), ("date", DESCENDING)])
     db.financial_transactions.create_index("id", unique=True)
     db.transactions.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
@@ -78,22 +92,25 @@ def init_db():
     db.agenda_events.create_index("id", unique=True)
     db.training_courses.create_index([("user_id", ASCENDING)])
     db.training_courses.create_index("id", unique=True)
-    db.training_leads.create_index("id", unique=True)
-    db.reports.create_index("id", unique=True)
-    db.trader_scores.create_index("id", unique=True)
+    db.training_leads.create_index("id",         unique=True)
+    db.reports.create_index("id",                unique=True)
+    db.trader_scores.create_index("id",          unique=True)
     db.psychological_patterns.create_index("id", unique=True)
-    db.ai_analysis.create_index("id", unique=True)
-    db.agenda_reminders_sent.create_index("id", unique=True)
+    db.ai_analysis.create_index("id",            unique=True)
+    db.agenda_reminders_sent.create_index("id",  unique=True)
 
-    # Créer l'utilisateur admin par défaut s'il n'existe pas
-    existing = db.users.find_one({"email": "fabrice.kengni@icloud.com"})
+    # Admin par défaut depuis les variables d'environnement
+    admin_email    = os.environ.get("ADMIN_EMAIL",    "fabrice.kengni@icloud.com")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "Kengni@fablo12")
+
+    existing = db.users.find_one({"email": admin_email})
     if not existing:
         uid = get_next_id("users")
         db.users.insert_one({
             "id": uid,
             "username": "kengni",
-            "email": "fabrice.kengni@icloud.com",
-            "password": generate_password_hash("Kengni@fablo12"),
+            "email": admin_email,
+            "password": generate_password_hash(admin_password),
             "role": "admin",
             "status": "active",
             "preferred_currency": "EUR",
@@ -105,11 +122,18 @@ def init_db():
             "updated_at": datetime.now().isoformat(),
             "last_login": None
         })
+        print(f"✅ Admin créé : {admin_email}")
     else:
-        # S'assurer que l'admin a toujours le bon mot de passe
+        # FIX MOT DE PASSE — toujours resynchroniser avec la variable d'env
         db.users.update_one(
-            {"email": "fabrice.kengni@icloud.com", "role": "admin"},
-            {"$set": {"password": generate_password_hash("Kengni@fablo12")}}
+            {"email": admin_email},
+            {"$set": {
+                "password":   generate_password_hash(admin_password),
+                "role":       "admin",
+                "status":     "active",
+                "updated_at": datetime.now().isoformat()
+            }}
         )
+        print(f"✅ Admin synchronisé : {admin_email}")
 
-    print("✅ MongoDB initialisée avec succès !")
+    print("✅ MongoDB Atlas prête !")
