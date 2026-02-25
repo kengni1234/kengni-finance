@@ -12,7 +12,7 @@ from datetime import datetime
 # ── Connection string ──────────────────────────────────────────────────────────
 MONGO_URI = os.environ.get(
     "MONGODB_URI",
-    "mongodb+srv://Vercel-Admin-fabricekengni12_db_user:MWoiKRSDZO3eVBVL@fabricekengni12-db-user.v193src.mongodb.net/kengni_finance?retryWrites=true&w=majority&appName=fabricekengni12-db-user"
+    "mongodb+srv://Vercel-Admin-fabricekengni12_db_user:aoo4baxbOeTkr5qz@fabricekengni12-db-user.v193src.mongodb.net/kengni_finance?retryWrites=true&w=majority&appName=fabricekengni12-db-user"
 )
 
 # ── Cache de connexion (crucial pour Vercel serverless) ───────────────────────
